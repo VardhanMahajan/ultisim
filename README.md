@@ -25,7 +25,7 @@ Requirements: Python 3.12+ and a C compiler (GCC, Clang or Apple clang). Full pe
 python -m venv .venv
 .venv/bin/pip install numpy scipy pytest          # Windows: .venv\Scripts\pip ...
 .venv/bin/python scripts/build_c.py               # builds the C engine (probes CPU + OpenMP flags)
-.venv/bin/python -m pytest -q                      # ~90 tests, about 1-2 minutes
+.venv/bin/python -m pytest -q                      # ~95 tests, about 2 minutes
 .venv/bin/python scripts/bench.py -n 4000          # possessions per second on your machine
 ```
 
@@ -96,7 +96,7 @@ The evolution runs so far were **short (100 generations, about 10 minutes each)*
 | An extremely wide mark wedge took over every defense | A wider wedge had no downside | Coverage now comes from the marker's body: wider when closer, but a tight mark reacts later |
 | Hammers on up to 27% of throws (hand-built zone offense) | Hammers went over the mark and couldn't be touched mid-flight, with no downside | Catch penalty and more error for hammers |
 | Evolved offenses broke the mark on 45–92% of throws at 90–97% completion | The mark only covered a narrow cone, and curved "around" breaks escaped it | Break-side coverage, curves judged along their whole path, more error on curves |
-| **Open:** `flex_1z6p` defenses (a dedicated marker plus six person defenders) conceding 3–4% | Suspected: matchups are re-optimized instantly and for free after every catch | Planned: sticky matchups, local switches, switch lag |
+| `flex_1z6p` defenses (a dedicated marker plus six person defenders) conceding 3–4% | Not the flex or switching: the defenders **fronted** (stood between attacker and disc). In flight they positioned against the live disc, sliding onto every throwing lane for free, and the thrower's read assumed they would just drift | Positional defenders read the disc in flight 0.45 s late; the thrower predicts the receiver's defender holding their spot; fronting reacts later (blind side); throw model refit on mutated and evolved strategies |
 
 **Run 3 results** (before the break fix, so treat the offensive results with caution):
 
@@ -105,9 +105,9 @@ The evolution runs so far were **short (100 generations, about 10 minutes each)*
 - **A non-textbook defense emerged.** It's person D forcing sideline with the marker sitting back at the 3 m limit. Defenders front their attackers (stand between them and the disc), give more cushion the further their attacker is from the disc, switch constantly and always bid. It held the hand-built offenses to 11–19% scoring; standard defenses allow 30–55%. This result does not depend on the break exploit.
 - **The evolved offense** was a 3–4-handler pod near the disc, one mid cutter about 20 m deep and one deep cutter about 35 m deep, frequent fakes and seek-space cuts. Most of its edge came from the break exploit, which is now fixed.
 
-**Run 4** (fixed simulator) showed the next exploit. Defenses converged on `flex_1z6p` and, in the audit, conceded only 3–4%. Until that's fixed, defensive results from runs that allow flex or switching are not trustworthy. See [docs/EVOLUTION.md](docs/EVOLUTION.md#7-results-so-far).
+**Run 4** showed the next exploit. Defenses converged on `flex_1z6p` and, in the audit, conceded only 3–4%. After the fix, the same champion concedes about 12% to the hand-built offenses (hand-built defenses: 33–49%). A short offense-only evolution against it reached 33% in 30 generations by throwing more aggressively and deeper. So fronting is now a strong defense with a counter, not an unbeatable one. Runs 1–4 predate the fix; rerun before trusting their defensive results. See [docs/EVOLUTION.md](docs/EVOLUTION.md#7-results-so-far).
 
-**Calibrated baseline** (hand-built strategies, current simulator with disc heights and lofted throws): completion 0.92, 0.39 score rate per possession from the goal line, 0.54 hold rate, 9.3 throws per score, breaks on about 10% of throws against person D at 0.82 completion, about a quarter of throws lofted. Scoring and hold rate sit slightly under their target bands. Known deviations from real club play: hucks are rarer but easier, turnovers lean toward drops over throwaways, and there are no stall-outs. Details are in [docs/SIMULATION.md](docs/SIMULATION.md).
+**Calibrated baseline** (hand-built strategies, current simulator with disc heights and lofted throws): completion 0.93, 0.40 score rate per possession from the goal line, 0.55 hold rate, 9.6 throws per score, breaks on about 10% of throws against person D at 0.82 completion, about a quarter of throws lofted. Scoring and hold rate sit slightly under their target bands. Known deviations from real club play: hucks are rarer but easier, turnovers lean toward drops over throwaways, and there are no stall-outs. Details are in [docs/SIMULATION.md](docs/SIMULATION.md).
 
 ---
 

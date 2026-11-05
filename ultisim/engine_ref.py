@@ -173,7 +173,7 @@ class Game:
         self.last_fake = -10.0
         self.s_open = 1.0
         self.reset_player = -1
-        self.hist = deque(maxlen=int(math.ceil(0.6 / self.dt)) + 2)
+        self.hist = deque(maxlen=int(math.ceil(1.0 / self.dt)) + 2)   # long enough for reaction + blind delay
         self.res: PossessionResult | None = None
         self.throw_model = load_throw_model(cfg)
         self.throw_log: list[dict] = []   # per-throw diagnostics: predicted p vs. outcome
@@ -576,20 +576,31 @@ class Game:
         cfg = self.cfg
         Dd = self.Dd
         top = self.R.top_speed
-        ref = self.disc_pos if self.flight is None else self.flight_pos_now()
+        ref = self.disc_pos
+        if self.flight is not None:
+            # positional defenders (zone spots AND person defenders) read the disc in flight late: they position
+            # against where it was zone_read_delay ago. Only defenders who have read the throw and are chasing
+            # it (CHASE, handled in update_chasers) go for the live disc. Positioning against the live disc gave
+            # fronting defenders free, instant lane tracking (the watch4 exploit).
+            f_ = self.flight
+            ref = self.fpos(f_, min(max((self.t - cfg.defense.zone_read_delay - f_.t0) / f_.T, 0.0), f_.s_end))
         mk = self.marker_id()
         chasing = set(i for i in Dd if self.mode[i] == CHASE)
         Pa, Va = self.delayed(self.O, np.full(7, 0.25))          # what defenders see of the offense (all roles)
-        if self.flight is not None:   # zone players read the disc late: their spots follow where it was
-            f_ = self.flight
-            zref = self.fpos(f_, min(max((self.t - cfg.defense.zone_read_delay - f_.t0) / f_.T, 0.0), f_.s_end))
-        else:
-            zref = ref
-        pts = self.zone_points(zref) if any(self.zslot[d] >= 0 for d in Dd) else None
+        pts = self.zone_points(ref) if any(self.zslot[d] >= 0 for d in Dd) else None
         person = [int(d) for d in Dd if int(d) in self.match]
         PD = {}
         if person:
-            Pd_, Vd_ = self.delayed(np.array([self.match[d] for d in person]), self.R.reaction_time[person])
+            # blind side: a defender standing between their attacker and the disc faces the thrower, with the
+            # attacker behind them, so they react later (up to blind_delay when fronting dead-on)
+            blind = np.zeros(len(person))
+            for n_, d in enumerate(person):
+                a = self.match[d]
+                u1, u2 = self.pos[d] - self.pos[a], ref - self.pos[a]
+                n1, n2 = np.hypot(*u1), np.hypot(*u2)
+                if n1 > 1e-6 and n2 > 1e-6:
+                    blind[n_] = cfg.defense.blind_delay * max(0.0, float(u1 @ u2) / (n1 * n2))
+            Pd_, Vd_ = self.delayed(np.array([self.match[d] for d in person]), self.R.reaction_time[person] + blind)
             PD = {d: (Pd_[n], Vd_[n]) for n, d in enumerate(person)}
         for i in Dd:
             if self.t < self.ground_until[i]:
@@ -620,15 +631,8 @@ class Game:
                 continue
             Pdj, Vdj = PD[int(i)]
             pa = Pdj + g.anticipation * Vdj * self.R.reaction_time[i]
-            to_disc = ref - pa
-            dist = np.hypot(*to_disc)
-            u = to_disc / max(dist, 1e-6)
-            w = np.clip((dist - 15.0) / 15.0, 0.0, 1.0)
-            th = math.radians((1 - w) * g.angle_near + w * g.angle_far)
-            dvec = math.cos(th) * u + math.sin(th) * np.array([0.0, self.s_open])
-            dvec /= max(np.hypot(*dvec), 1e-6)
-            cushion = g.cushion_base + g.cushion_per_m * dist
-            p = pa + cushion * dvec
+            p, dist = self.person_spot(pa, ref)
+            p, dist = p[0], float(dist[0])
             slow = np.hypot(*Vdj) < 3.0
             if slow and dist > 12.0:
                 p = (1 - g.poach) * p + g.poach * (ref + 0.55 * (pa - ref))
@@ -648,6 +652,21 @@ class Game:
                 tvel[i] = Vdj   # match the attacker's (delayed) velocity, then correct position
         self.help_on_cutter(tgt, tvel, mk, ref, Pa, Va)
         self.enforce_double_team(tgt, mk, tvel)
+
+    def person_spot(self, pa, ref):
+        """Person-D spot for attackers at pa (n,2) with the disc at ref: cushion metres off the attacker, at the
+        genome's angle from the attacker->disc direction (0 = fronting, 180 = trailing). Returns (spots, dists).
+        Shared by defender movement and by the thrower's read of the receiver's defender."""
+        g = self.dgen
+        pa = np.atleast_2d(pa)
+        to_disc = np.asarray(ref, float) - pa
+        dist = np.hypot(*to_disc.T)
+        u = to_disc / np.maximum(dist, 1e-6)[:, None]
+        w = np.clip((dist - 15.0) / 15.0, 0.0, 1.0)
+        th = np.radians((1 - w) * g.angle_near + w * g.angle_far)
+        dvec = np.cos(th)[:, None] * u + np.sin(th)[:, None] * np.array([0.0, self.s_open])
+        dvec /= np.maximum(np.hypot(*dvec.T), 1e-6)[:, None]
+        return pa + (g.cushion_base + g.cushion_per_m * dist)[:, None] * dvec, dist
 
     def help_on_cutter(self, tgt, tvel, mk, ref, Pa, Va):
         """Help defense: when a cutter has clearly beaten their defender, the nearest free defender
@@ -860,15 +879,35 @@ class Game:
         for frac in (0.0, 0.5, 1.0):
             along = self.pos[Dd][:, None, None, :] + self.vel[Dd][:, None, None, :] * (frac * np.minimum(tk[None], dlC[:, :, None]))[..., None]
             in_lane |= np.hypot(*(along - pts[None]).transpose(3, 0, 1, 2)) <= r_env + lane
+        # receiver arrival at the landing point
+        trec = time_to_reach(self.pos[rcv], self.vel[rcv], self.R.top_speed[rcv], self.R.accel[rcv],
+                             self.brake[rcv], self.reach[rcv], tgt, paired=True)
+        # the receiver's person defender doesn't drift: they keep to their spot relative to the receiver.
+        # The spot slides from where it is now to where it'll be at the catch point as the receiver runs
+        # (one reaction time behind), and the defender closes any current gap to it at top speed. A fronting
+        # defender, sitting up the lane from the receiver, is therefore still in the lane when the disc arrives.
+        dc = def_of[rcv]
+        cc = np.nonzero(dc >= 0)[0]
+        cc = cc[self.zslot[dc[cc]] < 0]
+        if len(cc):
+            d = dc[cc]
+            j = d - Dd[0]
+            rt = self.R.reaction_time[d][:, None]
+            spot0, _ = self.person_spot(self.pos[rcv[cc]], hp)
+            home, _ = self.person_spot(tgt[cc], hp)
+            err0 = self.pos[d] - spot0
+            e0 = np.maximum(np.hypot(*err0.T), 1e-6)[:, None]
+            frac = np.clip((tk[cc] - rt) / np.maximum(trec[cc], 0.05)[:, None], 0.0, 1.0)              # (n,K)
+            close = np.clip(1.0 - np.maximum(tk[cc] - rt, 0.0) * self.R.top_speed[d][:, None] / e0, 0.0, 1.0)
+            q = (spot0[:, None, :] + (home - spot0)[:, None, :] * frac[..., None]
+                 + err0[:, None, :] * close[..., None])                                                 # (n,K,2)
+            in_lane[j, cc] |= np.hypot(*(q - pts[cc]).transpose(2, 0, 1)) <= r_env[j, cc] + lane[0, cc]
         in_lane &= allowed
         tdef = np.where(in_lane, np.minimum(tdef, tk[None] - 0.3), tdef)
         tdef = np.where(allowed, tdef, 1e9)            # disc above this defender's reach at that point
         reflex = np.where(in_lane & (tk[None] < dlC[:, :, None]), cfg.defense.reflex_block, 1.0)
         # hucks are hard to judge early: everyone reads them later
         tdef = tdef + cfg.movement.huck_read_extra * huck[None, :, None]
-        # receiver arrival at the landing point
-        trec = time_to_reach(self.pos[rcv], self.vel[rcv], self.R.top_speed[rcv], self.R.accel[rcv],
-                             self.brake[rcv], self.reach[rcv], tgt, paired=True)
         # the receiver's own defender shadows them to the catch point (lagging by their current gap)
         if True:
             dc = def_of[rcv]

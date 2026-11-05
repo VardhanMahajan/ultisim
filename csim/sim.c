@@ -762,12 +762,29 @@ static void maybe_switch(Game *G) {
         for (int i = 0; i < n; i++) { G->match[ds[i]] = att[r2c[i]]; G->def_of[att[r2c[i]]] = ds[i]; }
 }
 
+/* Person-D spot for an attacker at (pax,pay) with the disc at (rx,ry): cushion metres off the attacker, at the
+ * genome's angle from the attacker->disc direction (0 = fronting, 180 = trailing). Returns the attacker-disc
+ * distance. Shared by defender movement and by the thrower's read of the receiver's defender. */
+static double person_spot(const Game *G, double pax, double pay, double rx, double ry, double *ox, double *oy) {
+    const UsDefense *g = DG;
+    double tdx = rx - pax, tdy = ry - pay, dist = sqrt(tdx * tdx + tdy * tdy);
+    double ux = tdx / maxd(dist, 1e-6), uy = tdy / maxd(dist, 1e-6);
+    double w = clampd((dist - 15.0) / 15.0, 0.0, 1.0);
+    double th = ((1 - w) * g->angle_near + w * g->angle_far) * DEG2RAD;
+    double dvx = cos(th) * ux, dvy = cos(th) * uy + sin(th) * G->s_open;
+    double dn = maxd(sqrt(dvx * dvx + dvy * dvy), 1e-6);
+    dvx /= dn; dvy /= dn;
+    double cushion = g->cushion_base + g->cushion_per_m * dist;
+    *ox = pax + cushion * dvx; *oy = pay + cushion * dvy;
+    return dist;
+}
+
 static void defense_targets(Game *G, double *tx, double *ty, double *spd, double *tvx, double *tvy) {
     const UsDefense *g = DG;
     const UsConfig *c = G->c;
     double rx, ry;
-    if (G->in_flight) {
-        double s = clampd((G->t - G->f.t0) / G->f.T, 0.0, G->f.s_end);
+    if (G->in_flight) {   /* positional defenders (zone and person) read the disc in flight late */
+        double s = clampd((G->t - c->zone_read_delay - G->f.t0) / G->f.T, 0.0, G->f.s_end);
         flight_pos(G, s, &rx, &ry);
     } else { rx = G->dx; ry = G->dy; }
     int mk = marker_id(G);
@@ -777,14 +794,7 @@ static void defense_targets(Game *G, double *tx, double *ty, double *spd, double
     for (int j = 0; j < 7; j++) delayed(G, O0 + j, 0.25, &Pax[j], &Pay[j], &Vax[j], &Vay[j]);
     int any_zone = 0;
     for (int i = D0; i < D0 + 7; i++) any_zone |= G->zslot[i] >= 0;
-    if (any_zone) {   /* zone players read the disc late: their spots follow where it was */
-        double zx0 = rx, zy0 = ry;
-        if (G->in_flight) {
-            double sz = clampd((G->t - c->zone_read_delay - G->f.t0) / G->f.T, 0.0, G->f.s_end);
-            flight_pos(G, sz, &zx0, &zy0);
-        }
-        zone_points(G, zx0, zy0, zx, zy);
-    }
+    if (any_zone) zone_points(G, rx, ry, zx, zy);
     for (int i = D0; i < D0 + 7; i++) {
         if (G->t < G->ground_until[i]) { tx[i] = G->px[i]; ty[i] = G->py[i]; spd[i] = 0.0; continue; }
         if (G->mode[i] == GROUND) G->mode[i] = rest_mode(G, i);
@@ -814,17 +824,16 @@ static void defense_targets(Game *G, double *tx, double *ty, double *spd, double
         }
         double Pdx, Pdy, Vdx, Vdy;
         double rt = G->P[i].reaction_time;
-        delayed(G, G->match[i], rt, &Pdx, &Pdy, &Vdx, &Vdy);
+        double blind = 0.0;   /* fronting: the attacker is behind the defender, so they react later */
+        {
+            int a = G->match[i];
+            double u1x = G->px[i] - G->px[a], u1y = G->py[i] - G->py[a], u2x = rx - G->px[a], u2y = ry - G->py[a];
+            double n1 = sqrt(u1x * u1x + u1y * u1y), n2 = sqrt(u2x * u2x + u2y * u2y);
+            if (n1 > 1e-6 && n2 > 1e-6) blind = c->blind_delay * maxd(0.0, (u1x * u2x + u1y * u2y) / (n1 * n2));
+        }
+        delayed(G, G->match[i], rt + blind, &Pdx, &Pdy, &Vdx, &Vdy);
         double pax = Pdx + g->anticipation * Vdx * rt, pay = Pdy + g->anticipation * Vdy * rt;
-        double tdx = rx - pax, tdy = ry - pay, dist = sqrt(tdx * tdx + tdy * tdy);
-        double ux = tdx / maxd(dist, 1e-6), uy = tdy / maxd(dist, 1e-6);
-        double w = clampd((dist - 15.0) / 15.0, 0.0, 1.0);
-        double th = ((1 - w) * g->angle_near + w * g->angle_far) * DEG2RAD;
-        double dvx = cos(th) * ux, dvy = cos(th) * uy + sin(th) * G->s_open;
-        double dn = maxd(sqrt(dvx * dvx + dvy * dvy), 1e-6);
-        dvx /= dn; dvy /= dn;
-        double cushion = g->cushion_base + g->cushion_per_m * dist;
-        double ppx = pax + cushion * dvx, ppy = pay + cushion * dvy;
+        double ppx, ppy, dist = person_spot(G, pax, pay, rx, ry, &ppx, &ppy);
         int slow = sqrt(Vdx * Vdx + Vdy * Vdy) < 3.0;
         if (slow && dist > 12.0) {
             ppx = (1 - g->poach) * ppx + g->poach * (rx + 0.55 * (pax - rx));
@@ -1091,9 +1100,29 @@ static int evaluate_throws(Game *G, Cands *C) {
                                 rk, alw, dl, ptx, pty, tk, lane, c->reflex_block, c->huck_read_extra * huck,
                                 tdef[j], reflex[j]);
             }
+            if (def_of[r] >= 0 && G->zslot[def_of[r]] < 0) {
+                /* the receiver's person defender doesn't drift: they move with the receiver toward their spot
+                 * relative to the catch point. A fronting defender is still in the lane when the disc arrives. */
+                int d = def_of[r], j = d - D0;
+                double rt = G->P[d].reaction_time, inv_tr = 1.0 / maxd(trec, 0.05), hx, hy, s0x, s0y;
+                person_spot(G, G->px[r], G->py[r], hpx, hpy, &s0x, &s0y);
+                person_spot(G, tx, ty, hpx, hpy, &hx, &hy);
+                double ex = G->px[d] - s0x, ey = G->py[d] - s0y, e0 = maxd(sqrt(ex * ex + ey * ey), 1e-6);
+                for (int k = 0; k < KS; k++) {
+                    if (hk_[k] > G->maxreach[d]) continue;
+                    double fr = clampd((tk[k] - rt) * inv_tr, 0.0, 1.0);
+                    double cl = clampd(1.0 - maxd(tk[k] - rt, 0.0) * TOP(d) / e0, 0.0, 1.0);
+                    double qx = s0x + (hx - s0x) * fr + ex * cl - ptx[k], qy = s0y + (hy - s0y) * fr + ey * cl - pty[k];
+                    double rr = G->reach[d] * (hk_[k] > G->standing[d] ? c->jump_reach_mult : 1.0) + lane[k];
+                    if (qx * qx + qy * qy <= rr * rr) {
+                        tdef[j][k] = mind(tdef[j][k], tk[k] - 0.3 + c->huck_read_extra * huck);
+                        if (tk[k] < base_dl[j]) reflex[j][k] = c->reflex_block;
+                    }
+                }
+            }
             if (def_of[r] >= 0) {
                 int d = def_of[r], j = d - D0;
-                double gap = maxd(dist2(G->px[d], G->py[d], G->px[r], G->py[r]) - G->reach[d] - lane[KS - 1], 0.0);
+                double gap =maxd(dist2(G->px[d], G->py[d], G->px[r], G->py[r]) - G->reach[d] - lane[KS - 1], 0.0);
                 double react = G->P[d].reaction_time + c->disc_read_delay;
                 double track = maxd(trec + 0.5 * G->P[d].reaction_time, react) + gap / TOP(d);
                 tdef[j][KS - 1] = mind(tdef[j][KS - 1], track);
@@ -1574,7 +1603,7 @@ static void init_game(Game *G, const UsConfig *c, const UsOffense *offs, const U
         G->mode[i] = SET; G->slot[i] = G->zslot[i] = G->match[i] = G->def_of[i] = -1;
         G->ground_until[i] = -1.0;
     }
-    G->hmax = (int)ceil(0.6 / c->dt) + 2;
+    G->hmax = (int)ceil(1.0 / c->dt) + 2;   /* long enough for reaction + blind delay */
     if (G->hmax > HCAP) G->hmax = HCAP;
     G->last_fake = -10.0;
     G->s_open = 1.0;

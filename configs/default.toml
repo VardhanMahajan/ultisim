@@ -164,7 +164,8 @@ mark_react_dist = 0.8         # tight marks react late: block chance x (1 - exp(
 switch_interval = 0.5         # clam: how often person defenders may re-match
 switch_gain = 6.0             # metres of total running a switch must save when switch gene = 0 (scaled by 1-switch)
 trap_zone = 8.0               # within this distance of a sideline a trapping zone collapses
-zone_read_delay = 0.45         # zone spots follow the disc's position this long ago (reaction + read)
+blind_delay = 0.35            # fronting (between attacker and disc) adds up to this much reaction delay to the attacker
+zone_read_delay = 0.45         # in flight, positional defenders (zone spots and person D not chasing) follow where the disc was this long ago
 help_sep = 2.5                # a cutter this far from their defender (and moving) triggers help defense
 stack_radius = 6.0            # attackers within this distance of each other count as a stack cluster
 mark_width_ref = 50.0          # wedges wider than this (half-width, deg) spread the same blocking thinner

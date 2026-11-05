@@ -1,6 +1,7 @@
 """Statistical parity: C engine vs. Python reference on the canonical matchups.
 
     python scripts/parity.py --n-py 48 --n-c 1500
+    python scripts/parity.py --defs person_forehand watch4:26     # <run>:<index> = an evolved defense from runs/<run>/state.pkl
 
 Both engines play the same rosters (common random numbers for players); their game RNGs differ, so
 we compare statistics. A metric FAILS if |C - Python| > 3 combined standard errors.
@@ -13,6 +14,7 @@ for _v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS"):
     os.environ.setdefault(_v, "1")
 
 import argparse  # noqa: E402
+import pickle  # noqa: E402
 import sys  # noqa: E402
 import time  # noqa: E402
 from concurrent.futures import ProcessPoolExecutor  # noqa: E402
@@ -26,12 +28,22 @@ sys.path.insert(0, str(ROOT))
 from ultisim.config import load_config  # noqa: E402
 from ultisim.engine import OUTCOMES, CEngine, make_specs, pack_defenses, pack_offenses, roster_matrix  # noqa: E402
 from ultisim.engine_ref import Game  # noqa: E402
-from ultisim.genome import CANONICAL_DEFENSES, CANONICAL_OFFENSES  # noqa: E402
+from ultisim.genome import CANONICAL_DEFENSES, CANONICAL_OFFENSES, DEFENSE_SCHEMA, DefenseGenome, from_vector  # noqa: E402
 from ultisim.roster import sample_roster  # noqa: E402
 
 OFF = ["vertical", "horizontal", "side", "iso"]
 DEF = ["person_forehand", "person_backhand", "person_middle", "cup_zone"]
 FIELDS = ["outcome", "throws", "completions", "hucks", "huck_completions", "breaks", "break_completions", "duration"]
+
+
+def get_defense(name):
+    """A canonical defense by name, or '<run>:<index>' for member <index> of a run's checkpointed defense population."""
+    if name in CANONICAL_DEFENSES:
+        return CANONICAL_DEFENSES[name]()
+    run, idx = name.rsplit(":", 1)
+    with open(ROOT / "runs" / run / "state.pkl", "rb") as f:
+        st = pickle.load(f)
+    return from_vector(np.asarray(st["dfn"][int(idx)], float), DEFENSE_SCHEMA, DefenseGenome, name=name)
 
 
 def rosters(k, cfg):
@@ -45,7 +57,7 @@ def py_job(args):
     rows = []
     for k in seeds:
         ra, rb = rosters(k, cfg)
-        g = Game(cfg, (ra, rb), (CANONICAL_OFFENSES[on](), None), (None, CANONICAL_DEFENSES[dn]()), seed=k)
+        g = Game(cfg, (ra, rb), (CANONICAL_OFFENSES[on](), None), (None, get_defense(dn)), seed=k)
         r = g.run_possession()
         rows.append((on, dn, OUTCOMES.index(r.outcome), r.throws, r.completions, r.hucks, r.huck_completions,
                      r.breaks, r.break_completions, r.duration))
@@ -98,7 +110,7 @@ def main():
 
     eng = CEngine(cfg)
     offs = pack_offenses([CANONICAL_OFFENSES[o]() for o in OFF])
-    defs = pack_defenses([CANONICAL_DEFENSES[d]() for d in a.defs])
+    defs = pack_defenses([get_defense(d) for d in a.defs])
     # C replays exactly Python's rosters (many game seeds each) so both estimate the same quantity
     pairs = [rosters(k % a.n_py, cfg) for k in range(a.n_c)]
     A = roster_matrix([p[0] for p in pairs])

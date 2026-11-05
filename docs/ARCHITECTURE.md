@@ -66,7 +66,7 @@ Results are identical either way and independent of the thread count (tested).
 - `scripts/bench.py` is the throughput reference. Run it after engine changes.
 
 ## The learned throw model
-`engine_ref.throw_features` and the matching block in `sim.c` compute 23 features per candidate throw. `configs/throw_model.json` stores the logistic-regression weights and the feature names, and the names are checked at load time. `scripts/fit_throw_model.py` fits the model from Python-reference self-play with exploration (throwers sometimes pick a random top-12 option, so the data covers more than the throws the model already likes). Refit it after any change to the physics.
+`engine_ref.throw_features` and the matching block in `sim.c` compute 23 features per candidate throw. `configs/throw_model.json` stores the logistic-regression weights and the feature names, and the names are checked at load time. `scripts/fit_throw_model.py` fits the model from Python-reference self-play with exploration (throwers sometimes pick a random top-12 option, so the data covers more than the throws the model already likes). Each round plays every hand-built matchup plus 80 random pairs of **heavily mutated hand-built strategies and evolved strategies from `runs/*/state.pkl`** (`--no-runs` skips those). A model fitted only on textbook defenses is badly over-confident against the odd defenses evolution invents. Refit it after any change to the physics.
 
 ## Visualization
 `viz/server.py` is a stdlib HTTP server bound to 127.0.0.1. It serves:

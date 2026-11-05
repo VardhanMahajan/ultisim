@@ -91,7 +91,7 @@ For each candidate it estimates the completion probability `p`:
    - **Arrival time.** A closed-form time-to-reach that accounts for current velocity, turning cost, reaction delay and drift.
    - **Reach envelope.** At each path point the defender's reach depends on the disc's height there: out of reach above their envelope, smaller radius when they'd have to jump.
    - **Throw error.** The defender's reach is widened by the throw's error, since the real flight wanders.
-   - **Receiver's own defender.** Modelled as shadowing the receiver to the catch point.
+   - **Receiver's own defender.** Modelled as holding their spot next to the receiver. The spot slides from where it is now to where it'll be at the catch point, and they close any current gap to it at top speed. A fronting defender is therefore predicted to still be in the lane when the disc gets there.
    - **Combined with:** the mark block chance, receiver arrival, error vs adjust radius, out-of-bounds risk and hands.
 2. **Learned correction.** A logistic regression on 23 features of that analysis (margins of the most dangerous defender, distance, flight time, huck/hammer/curve/break/lofted flags, stall, receiver speed, ...), fitted from self-play with exploration by [`scripts/fit_throw_model.py`](../scripts/fit_throw_model.py). It's calibrated to within a few points in every probability bucket. **Refit it whenever the physics change.**
 
@@ -146,12 +146,14 @@ Players are **re-matched to slots after every throw** (Hungarian assignment, wit
 The `zone` gene sets how many of the 7 defenders play zone: `k = round(zone × 7)`.
 
 - **Person D (k = 0):** matchups by speed and distance. Defenders position relative to their attacker with an angle (0 = between the attacker and the disc, 180 = deep side, +90 = open side) that blends from `angle_near` to `angle_far` with distance from the disc. Cushion = `cushion_base + cushion_per_m × distance`.
+  - **Blind side:** a defender fronting their attacker (between them and the disc) has the attacker behind them, so they react up to 0.35 s later to the attacker's cuts.
+  - **In flight**, defenders who aren't chasing the disc position against where it was 0.45 s ago, like zone players. Only a defender who has read the throw goes for the live disc.
   - `poach`: sag into the lanes off stationary attackers.
   - `switch` (clam): every 0.5 s defenders may re-match to the nearest attackers if that saves enough running.
   - `help_cut`: when a cutter beats their defender by more than 2.5 m, the nearest free defender steps into that cutter's lane.
   - `stack_sag`: defenders of stationary attackers in a cluster sag into the stack.
 - **Zone (k = 7):** a marker plus 6 zone spots relative to the disc, re-assigned after every catch. Zone players shade toward attackers in their area (`zone_shade`) and chase throws.
-  - **Read delay:** zone spots follow where the disc was 0.45 s ago (reaction + read), so a quick swing can beat the cup.
+  - **Read delay:** zone spots follow where the disc was 0.45 s ago (reaction + read), so a quick swing can beat the cup. The same delay applies to person defenders in flight.
   - `trap`: near a sideline the short zone players collapse on the thrower.
 - **Flex (k = 1..6):** the marker and k−1 zone spots, with person D on the 7−k cutters chosen by `flex_focus` (deepest first, or closest to the disc first).
   - `transition_throws`: a zone or flex switches to person D after N completions.

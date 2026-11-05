@@ -192,7 +192,7 @@ Exploits found so far (all fixed, with regression tests or calibration checks):
 | watch1 | 31 of 32 defenses = straight-up mark at max width | Wide coverage of every forward throw | Body-based mark: coverage from mark distance; tight marks react later |
 | watch2 | The hand-built zone offense threw hammers on 8–27% of throws | Hammers went over the mark and were untouchable, with no cost | Hammer catch penalty and ×2 error |
 | watch3 | Offenses breaking the mark on 45–92% of throws at 90–97% completion | Narrow mark cone; curved around-breaks judged only by their first 2 m | Break-side tail, release/target bisector, more curve error |
-| watch4 | `flex_1z6p` defenses conceding 3–4% | Suspected: matchups re-optimized instantly and for free after every catch and every 0.5 s of switching | **Open:** sticky matchups, local switches, switch lag |
+| watch4 | `flex_1z6p` defenses conceding 3–4% | **Fronting** (`angle_near` ≈ −4°, cushion 1.9 m + 0.22 m per m from the disc). In flight, person defenders positioned against the live disc, so a fronting defender slid onto every lane for free. The thrower's read assumed defenders drift on their current velocity, so it rated these throws 0.91 when they completed 0.76. Not the flex or switching: switching off changed nothing | In-flight read delay for all positional defenders; the thrower predicts the receiver's defender holding their spot; blind-side delay; throw model fitted on mutated and evolved strategies too. The champion now concedes 0.12, and evolved offenses reach 0.33 against it (regression test `test_thrower_sees_fronting_defender_step_into_the_lane`) |
 
 ## 7. Results so far
 These runs were short (100 generations, about 10 minutes). Treat them as tests of the machinery.
@@ -203,15 +203,15 @@ These runs were short (100 generations, about 10 minutes). Treat them as tests o
 - **Emergent defense:** person D forcing sideline, marker sitting back at 3 m, defenders fronting their attackers with cushion growing with distance from the disc, constant switching, always bidding. It conceded 11–19% to the hand-built offenses; hand-built defenses allow 30–55%.
 - **Emergent offense:** a 3–4-handler pod near the disc, a mid cutter about 20 m deep and a deep cutter about 35 m deep. Its edge came mostly from the break exploit (now fixed); after the fix it is level with the hand-built stacks.
 
-**watch4** (first run on the fixed simulator; 100 generations, 20 min). **Open exploit, not yet fixed:**
+**watch4** (first run on the break-fixed simulator; 100 generations, 20 min). Exploit found, **fixed since** (see the table above):
 - Defenses won decisively. The average offense score fell from 0.34 to 0.30, the average conceded rate from 0.32 to 0.22, and the best defenses reached 0.05–0.10.
 - By generation 99, 28 of 32 defenses were `flex_1z6p`: one dedicated marker who sprints to every new thrower, with six person defenders.
 - The audit shows these concede **only 2.7–4.4%** to the hand-built offenses. That's far beyond anything plausible.
-- **Suspected cause:** after every catch the flex code re-matches all person defenders optimally and instantly, and clam switching re-matches optimally every 0.5 s. Re-matching costs nothing, so the defense effectively gets a perfect, instant switch on every throw.
-- **Planned fix:**
-  - matchups are sticky (changing a matchup costs metres in the assignment)
-  - switches only happen between nearby defenders
-  - a defender who just switched tracks with extra delay.
+- **First suspicion (wrong):** free instant re-matching after every catch and every switch. Turning switching off, or playing the same genes as plain person D, changed the conceded rate by less than 0.01.
+- **Actual cause:** the genes that mattered were the positioning ones. Resetting `angle_near`, `angle_far` or `mark_angle` to standard values each raised the conceded rate to 0.15–0.18. The defenders fronted. 90% of the Ds were by the receiver's own defender, who stood about halfway along a short throw at release.
+  - In flight, person defenders positioned against the live disc, sliding onto the lane with no read.
+  - The thrower's read assumed a defender who hasn't read the throw keeps drifting on their current velocity, rather than holding their spot next to the receiver.
+- **After the fix:** the champion concedes 0.12 to the hand-built offenses (0.048 before). Offenses evolved against it alone (32 offenses, 30 generations) reached 0.33 by throwing more aggressively and deeper, and still score 0.34–0.39 against person D.
 - Hammers also crept back to 14% of throws by the end, as the offenses' release valve against these defenses. Re-check after the fix.
 - Champion family by generation: spread 42, vertical 16, side 15, horizontal 14, iso 13. Best score ever per family: vertical 0.54, iso 0.54, spread 0.52, horizontal 0.51, side 0.47.
 

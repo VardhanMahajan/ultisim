@@ -567,3 +567,26 @@ Ways to go faster, in order of payoff:
 - Hammers are now almost never chosen.
 - Parity: all overall metrics within 1.4 SE.
 - 94 tests pass.
+
+
+### 2026-11-06: The watch4 defense exploit (fronting)
+
+**Diagnosis**
+- watch4's `flex_1z6p` champion conceded 0.043 to the hand-built offenses; person forehand concedes about 0.39.
+- Not re-matching: turning `switch` off gave 0.044, and the same genes as plain person D gave 0.045.
+- Gene ablations: resetting `angle_near` gave 0.167, `angle_far` 0.183, `mark_angle` 0.148. The defense **fronts** (angle about -4 deg, cushion 1.9 m + 0.22 m per m).
+- Against it, 48% of possessions ended in downfield blocks (15% against person D). Throwers expected 0.93 completion and got 0.83. 90% of the Ds came from the receiver's own defender, standing about halfway along a ~9 m throw at release.
+
+**Root causes and fixes** (both engines; ABI 12)
+1. **In-flight positioning used the live disc.** Person defenders not chasing positioned against `flight_pos_now()`, so a fronting defender tracked the disc onto the lane with no read. Now all positional defenders use the disc position `zone_read_delay` (0.45 s) ago, as zone players already did. Effect: 0.048 -> 0.084.
+2. **The thrower's read assumed drift.** The evaluator moved defenders who hadn't read the throw on their current velocity. Now the receiver's person defender holds their genome spot (`person_spot`, shared with movement): the spot slides with the receiver to the catch point, and they close any gap at top speed. Regression test: `test_thrower_sees_fronting_defender_step_into_the_lane`. Effect: -> 0.107.
+3. **Blind side.** A defender fronting their attacker reacts up to `blind_delay` = 0.35 s later to the attacker's moves. Small effect on its own.
+4. **Throw model on diverse defenses.** `fit_throw_model.py` now also plays 80 random pairs per round of heavily mutated hand-built strategies and evolved ones from `runs/*/state.pkl`. On that data the old model's held-out log-loss was 0.485 and the refit's 0.358. The previous model is saved as `runs/throw_model_pre_diverse.json`.
+
+**Results**
+- The champion concedes **0.12** to the hand-built offenses (person FH 0.39, cup 0.34).
+- **It has a counter.** An offense-only GA against the frozen champion (32 offenses, 30 generations, 200 possessions each) went from 0.10-0.17 to **0.33** on 1,500 fresh possessions. The evolved offenses throw more aggressively (risk aversion about 0) and deeper, and still score 0.34-0.39 against person D. So fronting is a strong defense that coevolution can answer, not an exploit.
+- Calibration on C: completion 0.927, score 0.399, hold 0.546, 9.6 throws per score, hucks 3.2% at 0.64, Ds 46% of turnovers (back in band).
+- Parity on the canonical matchups and on the watch4 champion: all overall metrics within 1.6 SE.
+- 95 tests pass. About 400-540 possessions/s.
+- Runs watch1-4 predate this fix.

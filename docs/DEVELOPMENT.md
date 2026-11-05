@@ -10,7 +10,8 @@ Commands are shown with `.venv/bin/python`; on Windows use `.venv\Scripts\python
 .venv/bin/python scripts/calibrate.py --engine c -n 400 --points 1600     # calibration on C (~30 s)
 .venv/bin/python scripts/calibrate.py -n 24          # calibration on the Python reference, with per-throw diagnostics (minutes)
 .venv/bin/python scripts/parity.py --n-py 40 --n-c 2000                   # C vs Python, same rosters (~4 min)
-.venv/bin/python scripts/fit_throw_model.py --rounds 3 -n 24 --eps 0.25 --fresh   # refit the throw model (~5 min)
+.venv/bin/python scripts/parity.py --defs person_forehand watch4:26       # ... including an evolved defense (<run>:<index>)
+.venv/bin/python scripts/fit_throw_model.py --rounds 3 -n 24 --eps 0.25   # refit the throw model (~15 min on 12 cores)
 .venv/bin/python scripts/demo.py --replays-only      # example replays into runs/demo/
 ```
 

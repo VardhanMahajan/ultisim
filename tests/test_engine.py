@@ -221,3 +221,42 @@ def test_height_profile_and_loft():
     t_flat = D.flight_time(CFG, np.array([D.BH]), d, np.array([False]), np.array([False]))[0]
     t_loft = D.flight_time(CFG, np.array([D.BH]), d, np.array([False]), np.array([True]))[0]
     assert t_loft > t_flat + 0.3
+
+
+def _fronting_scene(angle, cushion, lat_err):
+    """Thrower at (40,18); a stationary receiver 11 m away; their defender sits `cushion` m off the receiver,
+    toward the disc (angle 0, fronting) or away from it (angle 180), and `lat_err` m off that spot sideways."""
+    import copy
+    ra, rb = rosters(4)
+    dg = copy.deepcopy(CANONICAL_DEFENSES["person_forehand"]())
+    dg.angle_near = dg.angle_far = angle
+    dg.cushion_base, dg.cushion_per_m = cushion, 0.0
+    g = Game(CFG, (ra, rb), (vertical_stack(), None), (None, dg), seed=1)
+    g.start_possession(np.array([40.0, 18.0]), fresh=True)
+    while g.holder < 0 or g.t < g.ready_time:
+        g.tick()
+    h = g.holder
+    hp = g.pos[h].copy()
+    r = next(int(o) for o in g.O if o != h)
+    d = next(dd for dd, a in g.match.items() if a == r)
+    for i in list(g.O) + list(g.Dd):   # everyone else far away
+        if i not in (h, r, d, g.marker_id()):
+            g.pos[i] = np.array([95.0, 2.0 + (i % 7) * 5.0])
+            g.vel[i] = 0.0
+    g.pos[r] = hp + np.array([11.0, 4.0])
+    g.vel[r] = 0.0
+    u = (hp - g.pos[r]) / np.hypot(*(hp - g.pos[r]))
+    g.pos[d] = g.pos[r] + cushion * (u if angle == 0.0 else -u) - np.array([0.0, lat_err])
+    g.vel[d] = 0.0
+    ev = g.evaluate_throws()
+    k = np.nonzero((ev["rcv"] == r) & (ev["curve"] == 0) & ~ev["loft"] & (ev["ttype"] != D.HAM)
+                   & (np.hypot(*(ev["tgt"] - g.pos[r]).T) < 0.3))[0]
+    return ev["p_d"][d - g.Dd[0]][k]
+
+
+def test_thrower_sees_fronting_defender_step_into_the_lane():
+    """Exploit fix (watch4): a person defender fronting the receiver, a step off the lane, will close onto it
+    while the disc is in the air. The thrower's read must see that (it used to assume they just drift)."""
+    for lat in (1.8, 2.5):
+        assert _fronting_scene(0.0, 3.5, lat).min() > 0.5
+    assert _fronting_scene(180.0, 1.5, 2.5).max() < 0.3   # a trailing defender is not in the lane

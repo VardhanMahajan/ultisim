@@ -16,7 +16,7 @@ from .roster import Roster
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILD = ROOT / "build"
-ABI_VERSION = 11
+ABI_VERSION = 12
 
 N_MODEL_W = 23  # learned throw-model weights (len(engine_ref.FEATURE_NAMES))
 
@@ -70,7 +70,7 @@ CONFIG_FIELDS: list[tuple[str, str]] = [
     ("mark_reach", "defense.mark_reach"), ("mark_break_tail", "defense.mark_break_tail"), ("mark_tail_deg", "defense.mark_tail_deg"),
     ("break_side_deg", "defense.break_side_deg"), ("mark_react_dist", "defense.mark_react_dist"),
     ("switch_interval", "defense.switch_interval"), ("switch_gain", "defense.switch_gain"),
-    ("help_sep", "defense.help_sep"), ("zone_read_delay", "defense.zone_read_delay"), ("stack_radius", "defense.stack_radius"), ("trap_zone", "defense.trap_zone"),
+    ("help_sep", "defense.help_sep"), ("blind_delay", "defense.blind_delay"), ("zone_read_delay", "defense.zone_read_delay"), ("stack_radius", "defense.stack_radius"), ("trap_zone", "defense.trap_zone"),
     ("block_prob", "defense.block_prob"), ("contest_base", "defense.contest_base"),
     ("contest_height_weight", "defense.contest_height_weight"),
     ("contest_position_weight", "defense.contest_position_weight"), ("reflex_block", "defense.reflex_block"),
