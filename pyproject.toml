@@ -1,0 +1,12 @@
+[project]
+name = "ultisim"
+version = "0.1.0"
+description = "Ultimate Frisbee strategy lab: simulator + coevolution of offensive and defensive strategies"
+requires-python = ">=3.12"
+dependencies = ["numpy>=2.0", "scipy>=1.12"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

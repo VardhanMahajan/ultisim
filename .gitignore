@@ -1,0 +1,26 @@
+# environments and caches
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# build output (rebuild with: python scripts/build_c.py)
+build/
+*.dll
+*.so
+*.dylib
+*.o
+# generated from ultisim/cabi.py at build time
+csim/us_structs.h
+
+# run outputs (large, machine-specific); share a run by copying runs/<run>/
+runs/
+
+# temp files from atomic writes
+*.tmp
+
+# local editor / agent config
+.claude/
+.vscode/
+.idea/
+.DS_Store

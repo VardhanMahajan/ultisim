@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>UltiSim Replay</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-disc"></span>UltiSim <span class="brand-sub">replay viewer</span></div>
+  <div class="picker">
+    <label for="replaySelect" class="sr-only">Replay</label>
+    <select id="replaySelect" title="Replays found under runs/"></select>
+    <button id="refreshList" class="icon-btn" title="Refresh replay list">&#x21bb;</button>
+    <label class="live-toggle" title="Poll the selected file every 3 s and reload when it changes">
+      <input type="checkbox" id="liveToggle"> Live
+    </label>
+    <span id="liveStatus" class="live-status"></span>
+  </div>
+  <div id="status" class="status" role="status"></div>
+  <a class="nav-link" href="dashboard.html" target="_top" title="Live dashboard for evolution runs">Evolution dashboard &rarr;</a>
+</header>
+
+<main class="layout">
+  <section class="stage">
+    <div class="scoreboard">
+      <h1 id="title">No replay loaded</h1>
+      <div id="teams" class="teams"></div>
+    </div>
+
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="field" aria-label="Top-down field view"></canvas>
+      <div id="resultBanner" class="result-banner hidden"></div>
+      <div id="emptyMsg" class="empty-msg hidden"></div>
+    </div>
+
+    <div class="timeline">
+      <div id="eventMarks" class="event-marks"></div>
+      <input type="range" id="scrub" min="0" max="0" step="1" value="0" aria-label="Scrub frames">
+    </div>
+
+    <div class="controls">
+      <div class="btn-group">
+        <button id="btnRestart" title="Restart (Home)">&#x21E4;</button>
+        <button id="btnBack" title="Step back one frame (&larr;, Shift = 1 s)">&#x25C2;&#x2759;</button>
+        <button id="btnPlay" class="primary" title="Play / pause (Space)">&#x25b6;</button>
+        <button id="btnFwd" title="Step forward one frame (&rarr;, Shift = 1 s)">&#x2759;&#x25B8;</button>
+      </div>
+      <div class="btn-group speeds" id="speeds" title="Playback speed (+ / -)"></div>
+      <div class="clock"><span id="clock">0.0 / 0.0 s</span><span id="frameNo" class="muted"></span></div>
+      <div class="keys muted">Space play &middot; &larr;&rarr; step &middot; +/- speed &middot; click a player</div>
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="card" id="hudCard">
+      <h3>State</h3>
+      <dl class="kv" id="hud"></dl>
+    </div>
+
+    <div class="card" id="playerCard">
+      <h3>Player <button id="closePlayer" class="icon-btn small hidden" title="Close">&times;</button></h3>
+      <div id="playerPanel" class="muted">Click a player on the field to see their stats.</div>
+    </div>
+
+    <div class="card events-card">
+      <h3>Events <span id="eventCount" class="muted"></span></h3>
+      <ol id="ticker" class="ticker"></ol>
+    </div>
+
+    <div class="card legend-card">
+      <h3>Legend</h3>
+      <ul class="legend" id="legend"></ul>
+    </div>
+  </aside>
+</main>
+
+<script src="viewer.js"></script>
+</body>
+</html>

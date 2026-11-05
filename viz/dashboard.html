@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>UltiSim Evolution</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="dashboard.css">
+</head>
+<body class="dash-body">
+<header class="topbar">
+  <div class="brand"><span class="brand-disc"></span>UltiSim <span class="brand-sub">evolution dashboard</span></div>
+  <div class="picker">
+    <label for="runSelect" class="sr-only">Run</label>
+    <select id="runSelect" title="Evolution runs found under runs/"></select>
+    <button id="refreshRuns" class="icon-btn" title="Refresh run list">&#x21bb;</button>
+    <span id="stateBadge" class="badge">&ndash;</span>
+  </div>
+  <div id="status" class="status" role="status"></div>
+  <a class="nav-link" id="viewerLink" href="index.html" title="Open the replay viewer">Replay viewer &rarr;</a>
+</header>
+
+<div class="runbar">
+  <span id="progText" class="prog-text">&ndash;</span>
+  <div class="progress" id="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Generations completed"><i id="progFill"></i></div>
+  <span id="timing" class="timing"></span>
+</div>
+
+<main class="dash">
+  <div id="banner" class="dash-msg hidden"></div>
+
+  <section class="kpis" id="kpis">
+    <div class="card kpi"><div class="k-label">Generation</div><div class="k-value" id="kGen">&ndash;</div><div class="k-sub" id="kGenSub">&nbsp;</div></div>
+    <div class="card kpi"><div class="k-label">Possessions simulated</div><div class="k-value" id="kPoss">&ndash;</div><div class="k-sub" id="kPossSub">&nbsp;</div></div>
+    <div class="card kpi"><div class="k-label">Best offense &middot; score rate</div><div class="k-value" id="kOff">&ndash;</div><div class="k-sub" id="kOffSub">&nbsp;</div></div>
+    <div class="card kpi"><div class="k-label">Best defense &middot; conceded</div><div class="k-value" id="kDef">&ndash;</div><div class="k-sub" id="kDefSub">&nbsp;</div></div>
+    <div class="card kpi"><div class="k-label">Champion family</div><div class="k-value" id="kFam">&ndash;</div><div class="k-sub" id="kFamSub">&nbsp;</div></div>
+  </section>
+
+  <section class="dash-grid">
+    <div class="card span-2">
+      <h3>Score rate per generation <span class="h-note muted">offense scores per possession &middot; defense = rate conceded (lower is better)</span></h3>
+      <div class="chart-legend" id="legendA"></div>
+      <div class="chart" id="chartA"></div>
+    </div>
+
+    <div class="card champ-card">
+      <h3>Offense champion <span class="h-note muted" id="champNote"></span></h3>
+      <div id="champ" class="muted">No generations yet.</div>
+    </div>
+
+    <div class="card span-2">
+      <h3>Offense population by structure family <span class="h-note muted">share of the population each generation</span></h3>
+      <div class="chart-legend" id="legendB"></div>
+      <div class="chart" id="chartB"></div>
+    </div>
+
+    <div class="card">
+      <h3>Best score rate by family <span class="h-note muted">archive, all generations</span></h3>
+      <div id="famBest" class="muted">No generations yet.</div>
+    </div>
+
+    <div class="card">
+      <h3>Defense scheme mix <span class="h-note muted" id="defMixNote"></span></h3>
+      <div id="defMix" class="muted">No generations yet.</div>
+    </div>
+
+    <div class="card champ-card">
+      <h3>Defense champion</h3>
+      <div id="defChamp" class="muted">No generations yet.</div>
+    </div>
+
+    <div class="card">
+      <h3>Play stats <span class="h-note muted">all games this generation</span></h3>
+      <div id="playStats" class="muted">No generations yet.</div>
+    </div>
+
+    <div class="card span-3 replay-card">
+      <h3>Champion replay <span class="h-note"><a id="replayLink" href="index.html" target="_blank" rel="noopener" class="hidden">Open full size &#x2197;</a></span></h3>
+      <div id="replayBox"><div class="placeholder"><b>No champion replay yet</b>The first champion replay appears after a few generations.</div></div>
+    </div>
+  </section>
+</main>
+
+<script src="dashboard.js"></script>
+</body>
+</html>

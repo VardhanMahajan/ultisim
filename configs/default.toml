@@ -1,0 +1,195 @@
+# Ultimate Strategy Lab: all physics / rules / "fairness" constants.
+# Units: metres, seconds, m/s. Frame: the offense always attacks +x.
+# x = 0 is the back of the offense's own end zone, x = 100 the back of the attacking end zone.
+# y runs across the field, 0..37. Facing downfield (+x), +y is the thrower's LEFT.
+
+[field]
+length = 100.0
+width = 37.0
+endzone_depth = 18.0          # attacking end zone: x in [82, 100]
+
+[sim]
+dt = 0.1                      # seconds per tick
+max_possession_time = 120.0   # safety cap; counts as a turnover ("timeout")
+max_point_possessions = 30    # full-point mode safety cap
+decision_interval = 0.4       # thrower re-reads the field this often (0.2 before 2026-11-05 speed pass)
+urgency_start = 40.0          # possession urgency: after this many seconds the thrower's patience and
+urgency_span = 40.0           # risk aversion fade linearly over this many seconds ...
+urgency_floor = 0.4           # ... down to this fraction (nobody swings forever)
+explore_eps = 0.0             # data collection only: chance a thrower picks a random top-12 throw
+start_x = 18.0                # standardized possession start: offense's own goal line
+start_y_margin = 8.0          # start y ~ U(margin, width - margin)
+
+[rules]
+stall_max = 10                # turnover at 10
+stall_rate = 1.0              # counts per second
+stall_radius = 3.0            # count only while the marker is within this distance
+pickup_grace = 1.5            # seconds after a turnover pickup before the mark may start counting
+double_team_radius = 3.0      # only the marker may be within this distance of the thrower; nobody
+                              # but the marker (via the mark-block model) can touch the disc this close
+
+# ---------------------------------------------------------------------------
+# Player stat distributions (club / college level, open division)
+# Each roster: 7 players. "athletic" and "handler" latent factors correlate stats.
+[players]
+athletic_corr = 0.6           # loading of speed / accel / vertical on a shared athletic factor
+handler_corr = 0.6            # loading of throwing / break skill on a shared handler factor
+
+top_speed = { mean = 7.5, sd = 0.6, lo = 6.0, hi = 9.2 }
+accel = { mean = 4.0, sd = 0.5, lo = 2.8, hi = 5.5 }
+agility = { lo = 0.0, hi = 1.0 }          # braking power + turning
+reaction_time = { mean = 0.27, sd = 0.04, lo = 0.18, hi = 0.38 }
+height = { mean = 1.80, sd = 0.07, lo = 1.60, hi = 2.03 }
+vertical = { lo = 0.40, hi = 0.80 }
+hands = { lo = 0.980, hi = 0.998 }        # uncontested catch probability
+throw_skill = { lo = 0.0, hi = 1.0 }      # accuracy multiplier source
+break_skill = { lo = 0.0, hi = 1.0 }
+decision_noise = { lo = 0.0, hi = 1.0 }   # 0 = perfect reads
+marking = { lo = 0.0, hi = 1.0 }
+release_time = { lo = 0.30, hi = 0.60 }   # catch -> earliest release
+
+range_backhand = { lo = 45.0, hi = 70.0 }
+range_forehand = { lo = 35.0, hi = 60.0 }
+range_hammer = { lo = 15.0, hi = 40.0 }
+
+[movement]
+jog_fraction = 0.55           # speed used when re-setting / not cutting
+brake_base = 1.2              # braking accel = accel * (brake_base + brake_agility * agility)
+brake_agility = 0.8
+reach_base = 0.90             # catch / block radius = reach_base + reach_height * (height - 1.6) + reach_vert * vertical
+reach_height = 0.6
+reach_vert = 0.4
+layout_extension = 1.5        # extra reach on a bid
+layout_ground_time = 1.5      # time on the ground after any bid
+layout_success_scale = 0.65   # catch/block probability multiplier on a bid
+huck_read_extra = 0.30      # hucks: extra time before anyone can judge where they will land
+disc_read_delay = 0.15        # time for players to read where a released disc is really going
+standing_reach_ratio = 1.25    # standing reach height = height x this (~2.0-2.5 m)
+jump_reach_mult = 0.6         # above standing reach a player must jump: lateral reach radius x this
+boundary_slack = 3.0          # players may run this far out of bounds
+
+# ---------------------------------------------------------------------------
+# Throws. Flight time T = hang + d / speed. Error sigma = (err_a + err_b * d) * multipliers.
+[throws]
+err_a = 0.20
+err_b = 0.030
+err_c = 0.0018                # quadratic term: long throws get much less accurate (45 m -> ~4 m sigma)
+skill_err_best = 0.6          # sigma multiplier at throw_skill = 1
+skill_err_worst = 1.3         # sigma multiplier at throw_skill = 0
+break_err_mult = 1.15         # throwing to the break side of the mark
+marked_err_mult = 1.10        # marker set (within stall radius)
+curve_err_mult = 1.25         # deliberately curved (IO / OI) throws
+huck_min_dist = 32.0          # throws longer than this fly as hucks
+min_throw_dist = 4.0
+specials_everywhere = false    # false: curved (IO/OI) throws and hammers are only considered for break-side targets
+learned_model = "configs/throw_model.json"   # learned completion model ("" = analytic only)
+model_error_margin = 1.0     # thrower model: defenders get +margin*sigma*s extra reach for throw error
+loft_speed_mult = 0.75          # lofted (touch) throws fly this much slower ...
+loft_hang_extra = 0.35          # ... and hang this much longer (s)
+loft_min_dist = 6.0             # lofted option offered for straight BH/FH between these distances (m)
+loft_max_dist = 35.0
+tail_time = 0.35            # after reaching its aim point the disc floats on this long before landing
+read_noise_base = 0.06          # thrower misjudges completion odds: logit noise = base + skill * decision_noise
+read_noise_skill = 0.30
+receiver_adjust = 1.2         # how far a receiver comfortably adjusts per second of flight
+fake_time = 0.4               # a pivot fake costs this much time
+fake_effect_time = 0.35       # marker coverage is displaced for this long
+fake_shift_deg = 35.0         # how far a fake pulls the marker's coverage
+
+[throws.backhand]
+speed = 18.0
+hang = 0.25
+huck_speed = 17.5
+huck_hang = 0.45
+release_side = 1.0            # +1 = thrower's left (+y when facing downfield)
+mark_mult = 1.0
+err_mult = 1.0
+early_unreachable = 0.0       # fraction of flight too high to intercept (hucks override)
+
+[throws.forehand]
+speed = 18.5
+hang = 0.20
+huck_speed = 17.0
+huck_hang = 0.45
+release_side = -1.0           # thrower's right
+mark_mult = 1.0
+err_mult = 1.08
+early_unreachable = 0.0
+
+[throws.hammer]
+speed = 12.5
+hang = 0.6
+release_side = -1.0
+mark_mult = 0.15              # goes over the mark
+err_mult = 2.0                # upside-down throws are hard to place
+unreachable_lo = 0.12         # disc too high to touch between these flight fractions
+unreachable_hi = 0.85
+
+[throws.huck]
+unreachable_lo = 0.05
+unreachable_hi = 0.45
+
+[throws.height]
+# disc height profile: release -> peak (at mid-flight) -> catch height; the tail sinks toward the ground
+release = 1.0
+hammer_release = 2.2           # hammers are thrown overhead
+catch = 1.2
+ground = 0.3
+flat_base = 1.0               # flat bullet peak = flat_base + flat_per_m * d   (~1.2-2 m)
+flat_per_m = 0.025
+loft_base = 2.0               # lofted touch pass peak = min(loft_base + loft_per_m * d, loft_max)   (~2.5-4.5 m)
+loft_per_m = 0.05
+loft_max = 4.5
+huck_base = 2.5               # huck peak = huck_base + huck_per_m * d   (35 m -> ~5.7 m)
+huck_per_m = 0.09
+hammer_base = 6.0             # hammer peak = hammer_base + hammer_per_m * d
+hammer_per_m = 0.05
+low_disc = 0.4                # discs below this are hard for anyone ...
+low_mult = 0.6                # ... catch / block chance multiplier
+
+[throws.curve]
+amount = 0.22                 # Bezier control-point offset as a fraction of throw distance
+
+# ---------------------------------------------------------------------------
+# Defence events
+[defense]
+mark_block_max = 0.55         # block probability for a throw dead-centre through a set mark
+mark_skill_weight = 0.5       # marker skill effect on block probability
+break_skill_weight = 0.5      # thrower break skill effect (reduces it)
+mark_break_tail = 0.6          # break-side tail: block coverage outside the body cone (linear fade, see mark_tail_deg)
+mark_tail_deg = 65.0          # the break-side tail fades to zero this far (deg) off the marker
+break_side_deg = 50.0         # a throw counts as a break if aimed within this angle of the marker
+mark_reach = 1.25             # marker arm+leg reach: coverage half-width = atan(mark_reach / mark_dist)
+mark_react_dist = 0.8         # tight marks react late: block chance x (1 - exp(-mark_dist / this))
+switch_interval = 0.5         # clam: how often person defenders may re-match
+switch_gain = 6.0             # metres of total running a switch must save when switch gene = 0 (scaled by 1-switch)
+trap_zone = 8.0               # within this distance of a sideline a trapping zone collapses
+zone_read_delay = 0.45         # zone spots follow the disc's position this long ago (reaction + read)
+help_sep = 2.5                # a cutter this far from their defender (and moving) triggers help defense
+stack_radius = 6.0            # attackers within this distance of each other count as a stack cluster
+mark_width_ref = 50.0          # wedges wider than this (half-width, deg) spread the same blocking thinner
+mark_set_radius = 3.0         # marker must be this close to block at all
+mark_block_near_dist = 2.5    # throws only get blocked in this initial stretch of flight
+block_prob = 0.88             # defender touching the disc first -> turnover
+contest_base = 0.0            # logit offset of contested catches (offense vs defense)
+contest_height_weight = 4.0   # logit per metre of effective height advantage
+contest_position_weight = 1.0 # logit bonus for being the one closer to the disc
+help_speed_margin = 0.25      # seconds of slack defenders allow themselves when deciding to go for a disc
+reflex_block = 0.35           # block-probability multiplier when the disc reaches a defender before they have read the throw
+help_read_delay = 0.35        # person-D help defenders watch their own player: extra time to read a throw
+
+[catching]
+speed_drop_per_ms = 0.001     # catch probability lost per m/s of disc speed above 12
+huck_drop = 0.12              # extra catch difficulty on hucks (over the shoulder, at full sprint)
+hammer_drop = 0.10            # hammers come down upside-down: harder to catch
+contest_drop = 0.015          # catch probability lost when a defender is within 2 m
+
+# ---------------------------------------------------------------------------
+# Heuristic field value V(x) = base + gain * u^power (u = progress through the playing proper),
+# minus an edge penalty near the sidelines. Throwers compare p * V(target) with the value of holding.
+# Phase 3/4 replaces this with a grid learned from simulation.
+[value]
+base = 0.45
+gain = 0.45
+power = 1.5
+edge_penalty = 0.06
